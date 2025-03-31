@@ -230,34 +230,82 @@ class FirestoreService {
   // Get current budget for user
   Future<BudgetModel?> getCurrentBudget(String userId) async {
     return _handleFirestoreOperation(() async {
-      // Get the current date
-      DateTime now = DateTime.now();
-      
-      QuerySnapshot snapshot = await _budgetsCollection
-          .where('userId', isEqualTo: userId)
-          .where('startDate', isLessThanOrEqualTo: Timestamp.fromDate(now))
-          .where('endDate', isGreaterThanOrEqualTo: Timestamp.fromDate(now))
-          .limit(1)
-          .get();
-      
-      if (snapshot.docs.isNotEmpty) {
-        return BudgetModel.fromFirestore(snapshot.docs.first);
+      try {
+        // Get the current date
+        DateTime now = DateTime.now();
+        
+        // Use a simpler query first to avoid index issues
+        QuerySnapshot snapshot = await _budgetsCollection
+            .where('userId', isEqualTo: userId)
+            .get();
+        
+        print('Fetched ${snapshot.docs.length} budgets for user $userId');
+        
+        // Process the results in memory instead of using complex queries
+        if (snapshot.docs.isNotEmpty) {
+          // Filter budgets where current date is between startDate and endDate
+          List<DocumentSnapshot> validBudgets = snapshot.docs.where((doc) {
+            Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+            
+            Timestamp startTimestamp = data['startDate'] as Timestamp;
+            Timestamp endTimestamp = data['endDate'] as Timestamp;
+            
+            DateTime startDate = startTimestamp.toDate();
+            DateTime endDate = endTimestamp.toDate();
+            
+            return now.isAfter(startDate) && now.isBefore(endDate.add(const Duration(days: 1)));
+          }).toList();
+          
+          print('Found ${validBudgets.length} valid budgets for current date');
+          
+          if (validBudgets.isNotEmpty) {
+            // If multiple budgets match, return the most recent one
+            validBudgets.sort((a, b) {
+              Map<String, dynamic> dataA = a.data() as Map<String, dynamic>;
+              Map<String, dynamic> dataB = b.data() as Map<String, dynamic>;
+              
+              Timestamp startA = dataA['startDate'] as Timestamp;
+              Timestamp startB = dataB['startDate'] as Timestamp;
+              
+              return startB.compareTo(startA); // Sort in descending order
+            });
+            
+            return BudgetModel.fromFirestore(validBudgets.first);
+          }
+        }
+        
+        return null;
+      } catch (e) {
+        print('Error getting current budget: $e');
+        return null;
       }
-      return null;
     });
   }
   
   // Get all budgets for a user
   Future<List<BudgetModel>> getUserBudgets(String userId) async {
     return _handleFirestoreOperation(() async {
-      QuerySnapshot snapshot = await _budgetsCollection
-          .where('userId', isEqualTo: userId)
-          .orderBy('startDate', descending: true)
-          .get();
-      
-      return snapshot.docs
-          .map((doc) => BudgetModel.fromFirestore(doc))
-          .toList();
+      try {
+        // Use a simpler query that doesn't require complex indexing
+        QuerySnapshot snapshot = await _budgetsCollection
+            .where('userId', isEqualTo: userId)
+            .get();
+        
+        print('Fetched ${snapshot.docs.length} budgets for user');
+        
+        // Convert to budget models
+        List<BudgetModel> budgets = snapshot.docs
+            .map((doc) => BudgetModel.fromFirestore(doc))
+            .toList();
+        
+        // Sort in memory instead of in the query
+        budgets.sort((a, b) => b.startDate.compareTo(a.startDate)); // Descending order
+        
+        return budgets;
+      } catch (e) {
+        print('Error getting user budgets: $e');
+        return [];
+      }
     });
   }
   
