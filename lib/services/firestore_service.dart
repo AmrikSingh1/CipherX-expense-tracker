@@ -62,16 +62,38 @@ class FirestoreService {
   
   // Add expense
   Future<String> addExpense(transaction_model.Transaction transaction) async {
+    print('FirestoreService.addExpense called');
     return _handleFirestoreOperation(() async {
-      DocumentReference docRef = await _expensesCollection.add(transaction.toFirestore());
+      // First ensure the transaction data includes the document ID field
+      final transactionData = transaction.toFirestore();
+      
+      // Check if transaction has an ID already
+      final String docId = transaction.id;
+      print('Using transaction ID: $docId');
+      
+      // Use the document ID as the Firestore document ID
+      DocumentReference docRef = _expensesCollection.doc(docId);
+      await docRef.set(transactionData);
+      
+      print('Transaction saved with ID: ${docRef.id}');
       return docRef.id;
     });
   }
   
   // Update expense
   Future<void> updateExpense(transaction_model.Transaction transaction) async {
+    print('FirestoreService.updateExpense called for ID: ${transaction.id}');
     return _handleFirestoreOperation(() async {
-      await _expensesCollection.doc(transaction.id).update(transaction.toFirestore());
+      // First ensure the transaction data includes the document ID field
+      final transactionData = transaction.toFirestore();
+      
+      if (transaction.id.isEmpty) {
+        print('ERROR: Cannot update transaction with empty ID');
+        throw Exception('Transaction ID is empty');
+      }
+      
+      await _expensesCollection.doc(transaction.id).set(transactionData, SetOptions(merge: true));
+      print('Transaction updated successfully');
     });
   }
   
@@ -99,15 +121,43 @@ class FirestoreService {
     DateTime startDate = DateTime(year, month, 1);
     DateTime endDate = DateTime(year, month + 1, 0, 23, 59, 59); // Last day of month
     
+    print('Fetching expenses for User: $userId, Year: $year, Month: $month');
+    print('Date range: ${startDate.toString()} to ${endDate.toString()}');
+    
+    // Use a simpler query first to check if any data exists for this user
     return _expensesCollection
         .where('userId', isEqualTo: userId)
-        .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
-        .where('date', isLessThanOrEqualTo: Timestamp.fromDate(endDate))
         .orderBy('date', descending: true)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => transaction_model.Transaction.fromFirestore(doc))
-            .toList());
+        .map((snapshot) {
+          print('Fetched ${snapshot.docs.length} total transactions for user');
+          
+          List<transaction_model.Transaction> allTransactions = snapshot.docs
+            .map((doc) {
+              try {
+                return transaction_model.Transaction.fromFirestore(doc);
+              } catch (e) {
+                print('Error parsing transaction document ${doc.id}: $e');
+                return null;
+              }
+            })
+            .where((transaction) => transaction != null)
+            .cast<transaction_model.Transaction>()
+            .toList();
+            
+          print('Successfully parsed ${allTransactions.length} transactions');
+          
+          // Filter by date in memory after fetching all documents
+          List<transaction_model.Transaction> filteredTransactions = allTransactions
+            .where((transaction) => 
+                transaction.date.isAfter(startDate.subtract(const Duration(days: 1))) && 
+                transaction.date.isBefore(endDate.add(const Duration(days: 1))))
+            .toList();
+          
+          print('Filtered to ${filteredTransactions.length} transactions in date range');
+          
+          return filteredTransactions;
+        });
   }
   
   // CATEGORIES COLLECTION OPERATIONS

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:expense_tracker/models/transaction_model.dart' as model;
 import 'package:expense_tracker/services/transaction_service.dart';
 import 'package:intl/intl.dart';
+import 'dart:math' as Math;
 
 class TransactionProvider with ChangeNotifier {
   final TransactionService _transactionService = TransactionService();
@@ -79,19 +80,39 @@ class TransactionProvider with ChangeNotifier {
     notifyListeners();
     
     try {
+      print('Fetching transactions for user: $_userId, year: $year, month: $month');
       final transactionsStream = _transactionService.getTransactionsByMonth(_userId, year, month);
       
       // Subscribe to the stream to get real-time updates
-      transactionsStream.listen((transactions) {
-        _transactions = transactions;
-        _isLoading = false;
-        notifyListeners();
-      }, onError: (e) {
-        _error = e.toString();
-        _isLoading = false;
-        notifyListeners();
-      });
+      transactionsStream.listen(
+        (transactions) {
+          _transactions = transactions;
+          print('Received ${transactions.length} transactions from Firestore');
+          
+          if (transactions.isNotEmpty) {
+            // Log details of the first few transactions for debugging
+            for (int i = 0; i < Math.min(3, transactions.length); i++) {
+              print('Transaction ${i + 1}: ${transactions[i].title}, '
+                  'Amount: ${transactions[i].amount}, '
+                  'Date: ${transactions[i].date}, '
+                  'ID: ${transactions[i].id}');
+            }
+          } else {
+            print('No transactions found for this month');
+          }
+          
+          _isLoading = false;
+          notifyListeners();
+        }, 
+        onError: (e) {
+          print('ERROR fetching transactions: $e');
+          _error = e.toString();
+          _isLoading = false;
+          notifyListeners();
+        }
+      );
     } catch (e) {
+      print('EXCEPTION fetching transactions: $e');
       _error = e.toString();
       _isLoading = false;
       notifyListeners();
@@ -100,8 +121,11 @@ class TransactionProvider with ChangeNotifier {
   
   // Add a new transaction
   Future<void> addTransaction(model.Transaction transaction) async {
+    print('TransactionProvider.addTransaction called');
+    
     if (_userId.isEmpty) {
       _error = 'User ID is not set';
+      print('ERROR: $_error');
       notifyListeners();
       return;
     }
@@ -113,7 +137,9 @@ class TransactionProvider with ChangeNotifier {
     try {
       // Set userId if not already set
       if (transaction.userId.isEmpty) {
+        print('Setting user ID for transaction to: $_userId');
         transaction = model.Transaction(
+          id: transaction.id,  // Preserve ID if it exists
           userId: _userId,
           title: transaction.title,
           amount: transaction.amount,
@@ -127,12 +153,16 @@ class TransactionProvider with ChangeNotifier {
         );
       }
       
-      await _transactionService.addTransaction(transaction);
+      print('Adding transaction to Firestore: ${transaction.title}, Type: ${transaction.type}, Amount: ${transaction.amount}');
+      final transactionId = await _transactionService.addTransaction(transaction);
+      print('Successfully added transaction with ID: $transactionId');
+      
       // No need to fetch transactions again as the stream will update automatically
       _isLoading = false;
       notifyListeners();
     } catch (e) {
       _error = e.toString();
+      print('ERROR adding transaction: $_error');
       _isLoading = false;
       notifyListeners();
     }

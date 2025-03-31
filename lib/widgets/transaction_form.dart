@@ -252,21 +252,29 @@ class _TransactionFormState extends State<TransactionForm> {
   
   void _saveTransaction() {
     if (_formKey.currentState!.validate()) {
+      print('Transaction form validation passed');
+      
+      // Get the user ID - we'll add it in the provider
+      final amount = double.parse(_amountController.text);
+      print('Creating transaction with Amount: $amount, Type: $_type');
+      
       final transaction = model.Transaction(
-        id: widget.transaction?.id,
-        userId: widget.transaction?.userId ?? '',
-        title: _titleController.text.trim(),
-        amount: double.parse(_amountController.text),
+        userId: widget.transaction?.userId ?? '',  // This will be added in the provider if empty
+        id: widget.transaction?.id,  // Use existing ID if editing, otherwise null to generate new ID
+        title: _titleController.text,
+        amount: amount,
         date: _selectedDate,
         category: _selectedCategory,
         type: _type,
-        note: _noteController.text.trim().isNotEmpty 
-            ? _noteController.text.trim() 
-            : null,
+        note: _noteController.text.isNotEmpty ? _noteController.text : null,
       );
       
+      print('Calling onSave with transaction: ${transaction.id}');
       widget.onSave(transaction);
+      
       Navigator.pop(context);
+    } else {
+      print('Transaction form validation failed');
     }
   }
   

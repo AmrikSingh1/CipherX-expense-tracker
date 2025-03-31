@@ -128,8 +128,13 @@ class Transaction {
 
   factory Transaction.fromFirestore(DocumentSnapshot doc) {
     Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+    
+    // Use Firestore document ID if 'id' field is missing
+    String id = data['id'] ?? doc.id;
+    
+    print('Transaction.fromFirestore - Doc ID: ${doc.id}, Field ID: ${data['id']}');
     return Transaction(
-      id: doc.id,
+      id: id,
       userId: data['userId'] ?? '',
       title: data['title'] ?? data['description'] ?? '', // Support both title and description fields
       amount: (data['amount'] ?? 0).toDouble(),
