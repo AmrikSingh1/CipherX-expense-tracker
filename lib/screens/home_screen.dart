@@ -2,12 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:expense_tracker/models/transaction_model.dart' as model;
 import 'package:expense_tracker/providers/auth_provider.dart';
 import 'package:expense_tracker/providers/transaction_provider.dart';
+import 'package:expense_tracker/providers/firestore_provider.dart';
 import 'package:expense_tracker/screens/analytics_screen.dart';
 import 'package:expense_tracker/screens/profile_screen.dart';
 import 'package:expense_tracker/utils/theme_utils.dart';
 import 'package:expense_tracker/widgets/summary_card.dart';
 import 'package:expense_tracker/widgets/transaction_card.dart';
 import 'package:expense_tracker/widgets/transaction_form.dart';
+import 'package:expense_tracker/widgets/enhanced_transaction_form.dart';
+import 'package:expense_tracker/widgets/transaction_list.dart';
+import 'package:expense_tracker/widgets/date_filter_widget.dart';
 import 'package:provider/provider.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -19,6 +23,8 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
+  DateTime _filterStartDate = DateTime(DateTime.now().year, DateTime.now().month, 1);
+  DateTime _filterEndDate = DateTime(DateTime.now().year, DateTime.now().month + 1, 0, 23, 59, 59);
 
   @override
   void initState() {
@@ -49,8 +55,8 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           if (_selectedIndex == 0)
             IconButton(
-              icon: const Icon(Icons.calendar_month),
-              onPressed: () => _showMonthPicker(context),
+              icon: const Icon(Icons.filter_list),
+              onPressed: () => _showFilterOptions(context),
             ),
         ],
       ),
@@ -101,9 +107,18 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildHomeContent() {
     final transactionProvider = Provider.of<TransactionProvider>(context);
+    final firestoreProvider = Provider.of<FirestoreProvider>(context);
     
     if (transactionProvider.isLoading) {
       return const Center(child: CircularProgressIndicator());
+    }
+    
+    // Create a map of category IDs to names
+    Map<String, String> categoryNames = {};
+    if (firestoreProvider.categories != null) {
+      for (final category in firestoreProvider.categories!) {
+        categoryNames[category.id] = category.name;
+      }
     }
     
     return Column(
@@ -115,51 +130,80 @@ class _HomeScreenState extends State<HomeScreen> {
           period: transactionProvider.formattedMonth,
         ),
         
-        // Month Navigation
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              IconButton(
-                icon: const Icon(Icons.arrow_back_ios),
-                onPressed: () => transactionProvider.changeMonth(-1),
-              ),
-              Text(
-                transactionProvider.formattedMonth,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.arrow_forward_ios),
-                onPressed: () => transactionProvider.changeMonth(1),
-              ),
-            ],
-          ),
+        // Date Filter
+        DateFilterWidget(
+          initialStartDate: _filterStartDate,
+          initialEndDate: _filterEndDate,
+          onFilterChanged: (startDate, endDate) {
+            setState(() {
+              _filterStartDate = startDate;
+              _filterEndDate = endDate;
+            });
+          },
         ),
         
         // Transactions List
         Expanded(
           child: transactionProvider.transactions.isEmpty
               ? _buildEmptyState()
-              : ListView.builder(
-                  padding: const EdgeInsets.only(top: 8, bottom: 80),
-                  itemCount: transactionProvider.transactions.length,
-                  itemBuilder: (context, index) {
-                    final transaction = transactionProvider.transactions[index];
-                    return TransactionCard(
-                      transaction: transaction,
-                      onDelete: (id) {
-                        _confirmDeleteTransaction(context, id);
-                      },
-                      onTap: () => _showEditTransactionForm(context, transaction),
-                    );
-                  },
+              : TransactionList(
+                  transactions: _filterTransactionsByDate(transactionProvider.transactions),
+                  onDeleteTransaction: (id) => _confirmDeleteTransaction(context, id),
+                  onEditTransaction: (transaction) => _showEditTransactionForm(context, transaction),
+                  categoryNames: categoryNames,
                 ),
         ),
       ],
+    );
+  }
+
+  List<model.Transaction> _filterTransactionsByDate(List<model.Transaction> transactions) {
+    return transactions.where((transaction) {
+      return transaction.date.isAfter(_filterStartDate.subtract(const Duration(days: 1))) &&
+             transaction.date.isBefore(_filterEndDate.add(const Duration(days: 1)));
+    }).toList();
+  }
+
+  void _showFilterOptions(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(20),
+          topRight: Radius.circular(20),
+        ),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Filter Transactions',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 16),
+              DateFilterWidget(
+                initialStartDate: _filterStartDate,
+                initialEndDate: _filterEndDate,
+                onFilterChanged: (startDate, endDate) {
+                  setState(() {
+                    _filterStartDate = startDate;
+                    _filterEndDate = endDate;
+                  });
+                  Navigator.pop(context);
+                },
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -210,7 +254,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
       builder: (context) {
-        return TransactionForm(
+        return EnhancedTransactionForm(
           onSave: (transaction) {
             Provider.of<TransactionProvider>(context, listen: false)
                 .addTransaction(transaction);
@@ -231,7 +275,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
       builder: (context) {
-        return TransactionForm(
+        return EnhancedTransactionForm(
           transaction: transaction,
           onSave: (updatedTransaction) {
             Provider.of<TransactionProvider>(context, listen: false)
@@ -269,72 +313,5 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       },
     );
-  }
-  
-  void _showMonthPicker(BuildContext context) {
-    final transactionProvider = Provider.of<TransactionProvider>(context, listen: false);
-    final DateTime currentDate = transactionProvider.selectedDate;
-    
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Select Month'),
-          content: SizedBox(
-            width: double.maxFinite,
-            height: 300,
-            child: GridView.builder(
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 4,
-                childAspectRatio: 1,
-              ),
-              itemCount: 12,
-              itemBuilder: (context, index) {
-                final monthIndex = index + 1;
-                final bool isSelected = monthIndex == currentDate.month;
-                
-                return InkWell(
-                  onTap: () {
-                    final newDate = DateTime(currentDate.year, monthIndex);
-                    transactionProvider.changeMonth(monthIndex - currentDate.month);
-                    Navigator.pop(context);
-                  },
-                  child: Container(
-                    margin: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: isSelected ? AppTheme.primaryColor : Colors.transparent,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: isSelected ? AppTheme.primaryColor : Colors.grey.shade300,
-                      ),
-                    ),
-                    child: Center(
-                      child: Text(
-                        _getMonthLabel(monthIndex),
-                        style: TextStyle(
-                          color: isSelected ? Colors.white : Colors.black,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-  
-  String _getMonthLabel(int month) {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return months[month - 1];
   }
 } 

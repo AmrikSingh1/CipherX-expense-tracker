@@ -36,31 +36,24 @@ dependencies:
   cupertino_icons: ^1.0.8
   
   # Firebase
-  firebase_core: ^2.24.2
-  firebase_auth: ^4.17.4
-  cloud_firestore: ^4.15.4
-  google_sign_in: ^6.1.6
+  firebase_core: ^2.13.0
+  firebase_auth: ^4.6.2
+  cloud_firestore: ^4.8.0
+  google_sign_in: ^6.1.4
   
   # State Management
-  provider: ^6.1.2
+  provider: ^6.0.5
   
   # Local Database
-  sqflite: ^2.3.2
-  path: ^1.9.0
+  sqflite: ^2.2.8+4
+  path: ^1.8.3
   
   # UI Components
-  fl_chart: ^0.66.2
-  intl: ^0.19.0
-  flutter_slidable: ^3.0.1
-  google_fonts: ^6.2.1
-  
-  # Storage
-  shared_preferences: ^2.2.2
+  intl: ^0.18.1
+  fl_chart: ^0.63.0
+  uuid: ^3.0.7
   path_provider: ^2.0.15
-  
-  # Utility
-  uuid: ^4.3.3
-  csv: ^5.1.1
+  csv: ^5.0.2
   # Temporarily disable file_picker to get the app running
   #file_picker: ^4.6.1
   permission_handler: ^11.0.0
