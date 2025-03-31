@@ -25,7 +25,11 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     // Initialize transactions
     Future.microtask(() {
-      Provider.of<TransactionProvider>(context, listen: false).initTransactions();
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final userId = authProvider.user?.uid;
+      if (userId != null) {
+        Provider.of<TransactionProvider>(context, listen: false).initTransactions(userId);
+      }
     });
   }
 

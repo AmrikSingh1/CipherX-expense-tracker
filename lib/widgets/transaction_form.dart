@@ -254,6 +254,7 @@ class _TransactionFormState extends State<TransactionForm> {
     if (_formKey.currentState!.validate()) {
       final transaction = model.Transaction(
         id: widget.transaction?.id,
+        userId: widget.transaction?.userId ?? '',
         title: _titleController.text.trim(),
         amount: double.parse(_amountController.text),
         date: _selectedDate,

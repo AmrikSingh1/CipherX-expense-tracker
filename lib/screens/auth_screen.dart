@@ -6,6 +6,19 @@ import 'package:provider/provider.dart';
 class AuthScreen extends StatelessWidget {
   const AuthScreen({super.key});
 
+  // Format error message to be more user-friendly
+  String _formatErrorMessage(String error) {
+    if (error.contains('firestore') || error.contains('Firestore')) {
+      return 'Unable to connect to the database. You can still sign in, but some features may be limited.';
+    } else if (error.contains('network') || error.contains('connection')) {
+      return 'Network connection issue. Please check your internet connection and try again.';
+    } else if (error.contains('ERROR_CANCELED')) {
+      return 'Sign in was cancelled.';
+    } else {
+      return 'Authentication failed. Please try again.';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
@@ -61,7 +74,26 @@ class AuthScreen extends StatelessWidget {
                   onPressed: authProvider.isLoading 
                       ? null 
                       : () async {
-                          await authProvider.signInWithGoogle();
+                          try {
+                            final success = await authProvider.signInWithGoogle(context);
+                            if (!success && context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Failed to sign in with Google. Please try again.'),
+                                  backgroundColor: Colors.red,
+                                )
+                              );
+                            }
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Error: ${_formatErrorMessage(e.toString())}'),
+                                  backgroundColor: Colors.red,
+                                )
+                              );
+                            }
+                          }
                         },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.white,
@@ -70,15 +102,31 @@ class AuthScreen extends StatelessWidget {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(30),
                     ),
+                    elevation: 2,
                   ),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 6),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Image.network(
-                          'https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg',
+                        // Google Logo
+                        Container(
                           height: 24,
+                          width: 24,
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Center(
+                            child: Text(
+                              'G',
+                              style: TextStyle(
+                                color: Colors.blue[600],
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
                         ),
                         const SizedBox(width: 16),
                         const Text(
@@ -104,13 +152,31 @@ class AuthScreen extends StatelessWidget {
                       color: Colors.red.shade100,
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Text(
-                      authProvider.error!,
-                      style: const TextStyle(
-                        color: Colors.red,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      textAlign: TextAlign.center,
+                    child: Column(
+                      children: [
+                        Text(
+                          'Sign In Failed',
+                          style: TextStyle(
+                            color: Colors.red[700],
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _formatErrorMessage(authProvider.error!),
+                          style: TextStyle(
+                            color: Colors.red[700],
+                            fontWeight: FontWeight.w500,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 8),
+                        TextButton(
+                          onPressed: authProvider.clearError,
+                          child: const Text('Dismiss'),
+                        ),
+                      ],
                     ),
                   ),
                 ),

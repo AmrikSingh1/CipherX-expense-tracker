@@ -244,7 +244,7 @@ class ProfileScreen extends StatelessWidget {
             TextButton(
               onPressed: () {
                 Navigator.pop(context);
-                Provider.of<AuthProvider>(context, listen: false).signOut();
+                Provider.of<AuthProvider>(context, listen: false).signOut(context);
               },
               style: TextButton.styleFrom(
                 foregroundColor: Colors.red,
@@ -288,28 +288,14 @@ class ProfileScreen extends StatelessWidget {
   }
   
   void _clearAllData(BuildContext context) async {
-    try {
-      final transactionProvider = Provider.of<TransactionProvider>(context, listen: false);
-      await transactionProvider.deleteAllTransactions();
-      
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('All transactions deleted'),
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
-          ),
-        );
-      }
+    // Show message explaining that this functionality is not available
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Clearing all data is not available for cloud storage. Please delete transactions individually.'),
+          duration: Duration(seconds: 3),
+        ),
+      );
     }
   }
 } 

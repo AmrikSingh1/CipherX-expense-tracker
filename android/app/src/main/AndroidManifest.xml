@@ -1,11 +1,19 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <!-- Internet Permission -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Storage Permissions -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" 
+                     android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     
     <application
         android:label="Expense Tracker"
-        android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:name="com.cipherschools.assignment.expense_tracker.ExpenseTrackerApplication"
+        android:icon="@mipmap/ic_launcher"
+        android:requestLegacyExternalStorage="true"
+        android:usesCleartextTraffic="true"
+        android:largeHeap="true">
         <activity
             android:name=".MainActivity"
             android:exported="true"
